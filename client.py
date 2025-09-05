@@ -1,9 +1,9 @@
 import sys
 import asyncio
 import uuid
+import json
 from temporalio.client import Client
 from workflows import DocumentIngestionWorkflow
-
 
 async def main():
     if len(sys.argv) != 3:
@@ -23,7 +23,6 @@ async def main():
     else:
         raise RuntimeError("Failed to connect to Temporal after retries")
 
-    # unique workflow ID for each run
     workflow_id = f"workflow-{file_id}-{uuid.uuid4().hex[:6]}"
 
     handle = await client.start_workflow(
@@ -33,9 +32,10 @@ async def main():
         task_queue="doc-ingest-queue",
     )
 
+    result = await handle.result()
     print("Workflow result:")
-    print(await handle.result())
-
+    print(json.dumps(result, indent=2))
 
 if __name__ == "__main__":
     asyncio.run(main())
+

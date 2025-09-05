@@ -3,6 +3,7 @@ import os
 import uuid
 import tempfile
 from typing import List, Dict
+from urllib.parse import urlparse
 
 from unstructured.partition.auto import partition
 from pymilvus import connections, Collection, utility, DataType, CollectionSchema, FieldSchema
@@ -30,6 +31,9 @@ collection_name = "document_chunks"
 if not utility.has_collection(collection_name):
     fields = [
         FieldSchema(name="chunk_id", dtype=DataType.INT64, is_primary=True, auto_id=True),
+        FieldSchema(name="file_id", dtype=DataType.VARCHAR, max_length=100),
+        FieldSchema(name="chunk_index", dtype=DataType.INT64),
+        FieldSchema(name="chunk_text", dtype=DataType.VARCHAR, max_length=2000),
         FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=EMBED_DIM),
     ]
     schema = CollectionSchema(fields, description=f"Document chunks with {HF_EMBED_MODEL} embeddings ({EMBED_DIM}d)")
@@ -55,10 +59,16 @@ if not any(getattr(idx, "field_name", None) == "embedding" for idx in collection
 collection.load()
 print(f"Collection '{collection_name}' loaded")
 
+def _suffix_from_url(u: str) -> str:
+    path = urlparse(u).path
+    _, ext = os.path.splitext(path)
+    return ext if ext else ".bin"
+
 @activity.defn
 async def fetch_document(file_url: str, file_id: str) -> str:
     try:
-        filename = f"{file_id}_{uuid.uuid4().hex[:6]}.pdf"
+        suffix = _suffix_from_url(file_url)
+        filename = f"{file_id}_{uuid.uuid4().hex[:6]}{suffix}"
         filepath = os.path.join(TEMP_DIR, filename)
         async with aiohttp.ClientSession() as session:
             async with session.get(file_url) as resp:
@@ -104,12 +114,18 @@ def generate_embeddings(chunks: List[str]) -> List[List[float]]:
         return []
 
 @activity.defn
-def store_in_milvus(vectors: List[List[float]]) -> Dict:
+def store_in_milvus(rows: List[Dict]) -> Dict:
     try:
-        if not vectors:
-            raise ValueError("No vectors to insert into Milvus")
-        collection.insert([vectors])
+        if not rows:
+            return {"inserted": 0, "collection": collection_name, "dim": EMBED_DIM}
+
+        file_ids = [r["file_id"] for r in rows]
+        idxs = [int(r["chunk_index"]) for r in rows]
+        texts = [r["chunk_text"] for r in rows]
+        vecs = [r["embedding"] for r in rows]
+
+        mr = collection.insert([file_ids, idxs, texts, vecs])
         collection.flush()
-        return {"inserted": len(vectors), "collection": collection_name, "dim": EMBED_DIM}
+        return {"inserted": len(rows), "collection": collection_name, "dim": EMBED_DIM}
     except Exception as e:
         raise Exception(f"Milvus insert error: {str(e)}")

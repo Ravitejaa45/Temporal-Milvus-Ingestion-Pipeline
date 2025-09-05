@@ -11,11 +11,11 @@ print(collection.schema)
 
 print("\n Total entities in collection:", collection.num_entities)
 
-print("\n Sample inserted data:")
+print("\nSample rows:")
 try:
     results = collection.query(
         expr="chunk_id >= 0",
-        output_fields=["chunk_id"],
+        output_fields=["file_id", "chunk_index", "chunk_text"],
         limit=2,
     )
     for r in results:

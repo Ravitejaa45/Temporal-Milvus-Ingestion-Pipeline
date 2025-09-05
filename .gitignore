@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+
+# Env
+.env
+*.env
+
+# Docker volumes or runtime data
+volumes/
+*.log
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor folders
+.vscode/
+.idea/
+
+# Temporary files
+*.swp
+*.tmp
+
+# Pytest cache
+.pytest_cache/
+
+# Ignore compiled protobufs if any
+*.pb.go
+*.pb.cc
+*.pb.h
+*.pb.py
+
+# Utility/debug scripts not to be committed
+Dockerfile
